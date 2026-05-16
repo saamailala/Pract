@@ -51,6 +51,7 @@ class MemoryOrderGame(QMainWindow):
             }
             QPushButton:hover { background-color: #D9A9B4; }
         """)
+        self.rules_btn.clicked.connect(self.show_rules)
         layout.addWidget(self.rules_btn, alignment=Qt.AlignCenter)
 
         self.exit_btn = QPushButton("Выход")
@@ -71,6 +72,9 @@ class MemoryOrderGame(QMainWindow):
 
         self.welcome.setLayout(layout)
         self.main_layout.addWidget(self.welcome)
+
+    def show_rules(self):
+        print("Правила игры")
 
 
 if __name__ == "__main__":
