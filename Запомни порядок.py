@@ -4,6 +4,16 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 
+class RulesDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Правила игры")
+        self.setFixedSize(500, 320)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setModal(True)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+
 class MemoryOrderGame(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -74,7 +84,8 @@ class MemoryOrderGame(QMainWindow):
         self.main_layout.addWidget(self.welcome)
 
     def show_rules(self):
-        print("Правила игры")
+        dialog = RulesDialog(self)
+        dialog.exec()
 
 
 if __name__ == "__main__":
