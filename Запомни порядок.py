@@ -36,6 +36,21 @@ class RulesDialog(QDialog):
         rules_text.setWordWrap(True)
         layout.addWidget(rules_text)
 
+        ok_btn = QPushButton("Понятно")
+        ok_btn.setFont(QFont("Georgia", 14))
+        ok_btn.setFixedSize(180, 40)
+        ok_btn.setCursor(Qt.PointingHandCursor)
+        ok_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E8B4BC;
+                color: white;
+                border: none;
+                border-radius: 20px;
+            }
+            QPushButton:hover { background-color: #D9A9B4; }
+        """)
+        layout.addWidget(ok_btn, alignment=Qt.AlignCenter)
+
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(frame)
         self.setLayout(main_layout)
