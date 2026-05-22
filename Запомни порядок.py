@@ -26,6 +26,16 @@ class RulesDialog(QDialog):
         title.setStyleSheet("color: #6B4F5A; border: none;")
         layout.addWidget(title)
 
+        rules_text = QLabel(
+            "Запомните последовательность подсветки кнопок\n"
+            "и повторите её в правильном порядке.\n\n"
+            "Ваши результаты сохраняются в таблице рекордов."
+        )
+        rules_text.setFont(QFont("Georgia", 12))
+        rules_text.setStyleSheet("color: #8B6B76; border: none;")
+        rules_text.setWordWrap(True)
+        layout.addWidget(rules_text)
+
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(frame)
         self.setLayout(main_layout)
