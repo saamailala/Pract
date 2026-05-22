@@ -13,6 +13,23 @@ class RulesDialog(QDialog):
         self.setModal(True)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
+        frame = QFrame()
+        frame.setStyleSheet("background-color: #FDF5F5; border: 2px solid #E8B4BC; border-radius: 30px;")
+
+        layout = QVBoxLayout(frame)
+        layout.setSpacing(15)
+        layout.setContentsMargins(35, 30, 35, 30)
+
+        title = QLabel("Правила игры")
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Georgia", 22, QFont.Light))
+        title.setStyleSheet("color: #6B4F5A; border: none;")
+        layout.addWidget(title)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(frame)
+        self.setLayout(main_layout)
+
 
 class MemoryOrderGame(QMainWindow):
     def __init__(self):
