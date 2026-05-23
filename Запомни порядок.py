@@ -1,6 +1,7 @@
 import sys
+import random
 from PySide6.QtWidgets import *
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 
 
@@ -62,6 +63,14 @@ class MemoryOrderGame(QMainWindow):
         super().__init__()
         self.setWindowTitle("Запомни порядок")
         self.setWindowState(Qt.WindowMaximized)
+
+        self.sequence = []
+        self.player_sequence = []
+        self.level = 1
+        self.buttons = []
+        self.is_showing = False
+        self.clickable = False
+        self.player_name = "Аноним"
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
