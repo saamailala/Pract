@@ -49,6 +49,7 @@ class RulesDialog(QDialog):
             }
             QPushButton:hover { background-color: #D9A9B4; }
         """)
+        ok_btn.clicked.connect(self.accept)
         layout.addWidget(ok_btn, alignment=Qt.AlignCenter)
 
         main_layout = QVBoxLayout(self)
