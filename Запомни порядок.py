@@ -135,6 +135,19 @@ class MemoryOrderGame(QMainWindow):
         self.welcome.setLayout(layout)
         self.main_layout.addWidget(self.welcome)
 
+        self.game = QWidget()
+        game_layout = QVBoxLayout()
+        game_layout.setSpacing(30)
+
+        self.title_label = QLabel("Запомни порядок")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setFont(QFont("Georgia", 32))
+        self.title_label.setStyleSheet("color: #6B4F5A;")
+        game_layout.addWidget(self.title_label)
+
+        self.game.setLayout(game_layout)
+        self.game.hide()
+
     def show_rules(self):
         dialog = RulesDialog(self)
         dialog.exec()
