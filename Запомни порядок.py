@@ -10,6 +10,7 @@ from PySide6.QtMultimedia import QSoundEffect
 
 
 class BaseDialog(QDialog):
+    """Основа для всех всплывающих окон, чтобы не копипастить"""
 
     def __init__(self, title, width, height, parent=None):
         super().__init__(parent)
@@ -57,7 +58,6 @@ class BaseDialog(QDialog):
 
 
 class RulesDialog(BaseDialog):
-
     def __init__(self, parent=None):
         super().__init__("Правила игры", 500, 320, parent)
 
@@ -77,7 +77,6 @@ class RulesDialog(BaseDialog):
 
 
 class ExitConfirmDialog(BaseDialog):
-
     def __init__(self, level, parent=None):
         super().__init__("Выход в главное меню", 500, 320, parent)
 
@@ -101,7 +100,6 @@ class ExitConfirmDialog(BaseDialog):
 
 
 class DifficultyDialog(BaseDialog):
-
     def __init__(self, current, parent=None):
         super().__init__("Выберите сложность", 500, 380, parent)
 
@@ -153,7 +151,6 @@ class DifficultyDialog(BaseDialog):
 
 
 class MemoryOrderGame(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Запомни порядок")
@@ -395,6 +392,259 @@ class MemoryOrderGame(QMainWindow):
         btn.clicked.connect(callback)
         return btn
 
+    def _get_button_size(self):
+        """Размер кнопок зависит от их количества"""
+        if self.difficulty["buttons"] <= 6:
+            return 100, 28
+        if self.difficulty["buttons"] <= 8:
+            return 90, 24
+        return 80, 22
+
+    def _update_buttons_grid(self):
+        """Пересоздаём игровое поле под новую сложность"""
+        for btn in self.buttons:
+            btn.deleteLater()
+        self.buttons = []
+
+        while self.buttons_grid.count():
+            item = self.buttons_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self.button_colors = ["#F3E3E5", "#EFDADE", "#EBD1D6", "#E7C8CE", "#F2D0D9", "#EDC5D0", "#E8BAC7", "#E3AFC0",
+                              "#DEA4B6", "#D999AC"]
+        cols = self.difficulty["buttons"] // 2
+        btn_size, font_size = self._get_button_size()
+
+        for i in range(self.difficulty["buttons"]):
+            btn = QPushButton(str(i + 1))
+            btn.setFont(QFont("Georgia", font_size, QFont.Bold))
+            btn.setFixedSize(btn_size, btn_size)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet(
+                self._create_button_style(self.button_colors[i % len(self.button_colors)], btn_size, font_size))
+            btn.clicked.connect(lambda idx=i: self._on_button_click(idx))
+            btn.setEnabled(False)
+            self.buttons.append(btn)
+            self.buttons_grid.addWidget(btn, i // cols, i % cols)
+
+    def _on_button_click(self, index):
+        """Игрок нажал на кнопку — запоминаем и подсвечиваем"""
+        if not self.is_showing and self.clickable and self.buttons[index].isEnabled():
+            self.clickable = False
+            self.player_sequence.append(index)
+            if self.sounds.get("click"):
+                self.sounds["click"].play()
+
+            btn_size, font_size = self._get_button_size()
+            self.buttons[index].setStyleSheet(self._create_button_style("#D9BCC2", btn_size, font_size))
+            QTimer.singleShot(200, lambda: self._restore_button_color(index))
+            QTimer.singleShot(200, self._check_sequence)
+
+    def _restore_button_color(self, index):
+        """Возвращаем кнопке её обычный цвет"""
+        if index < len(self.buttons):
+            btn_size, font_size = self._get_button_size()
+            self.buttons[index].setStyleSheet(
+                self._create_button_style(self.button_colors[index % len(self.button_colors)], btn_size, font_size))
+            self.clickable = True
+
+    def _check_sequence(self):
+        """Проверяем, правильно ли игрок повторяет последовательность"""
+        if not self.player_sequence:
+            return
+        if self.player_sequence[-1] != self.sequence[len(self.player_sequence) - 1]:
+            self._game_over()
+        elif len(self.player_sequence) == len(self.sequence):
+            self._level_complete()
+
+    def _level_complete(self):
+        """Уровень пройден!"""
+        self.level += 1
+        self.level_label.setText(f"Уровень {self.level}")
+        if self.sounds.get("levelup"):
+            self.sounds["levelup"].play()
+        QTimer.singleShot(200, self._start_level)
+
+    def _game_over(self):
+        """Игра окончена — сохраняем результат и показываем экран"""
+        self.clickable = False
+        for btn in self.buttons:
+            btn.setEnabled(False)
+        self._save_record()
+        self.result_label.setText(f"{self.player_name}, вы дошли до {self.level} уровня")
+        if self.sounds.get("gameover"):
+            self.sounds["gameover"].play()
+        self.show_game_over_ui()
+
+    def _start_level(self):
+        """Начинаем уровень: генерим последовательность и показываем"""
+        for btn in self.buttons:
+            btn.setEnabled(False)
+
+        if self.level == 1:
+            self.sequence = [random.randint(0, self.difficulty["buttons"] - 1)]
+        else:
+            self.sequence.append(random.randint(0, self.difficulty["buttons"] - 1))
+
+        self.player_sequence = []
+        self.is_showing = True
+        self.clickable = False
+        self.title_label.setText("Запоминайте...")
+        QTimer.singleShot(500, self._show_sequence)
+
+    def _show_sequence(self):
+        """Подсвечиваем кнопки по очереди с нужной скоростью"""
+        speed = self.difficulty["speed"]
+        for i, idx in enumerate(self.sequence):
+            QTimer.singleShot(int(speed * i), lambda i=idx: self._highlight_button(i))
+        QTimer.singleShot(int(speed * len(self.sequence) + 300), self._allow_input)
+
+    def _highlight_button(self, index):
+        """Подсветка одной кнопки во время показа"""
+        if not self.is_showing:
+            return
+        btn_size, font_size = self._get_button_size()
+        self.buttons[index].setStyleSheet(self._create_button_style("#D9BCC2", btn_size, font_size))
+        QTimer.singleShot(300, lambda: self._restore_button_color(index))
+
+    def _allow_input(self):
+        """Разрешаем игроку нажимать кнопки"""
+        self.is_showing = False
+        self.clickable = True
+        self.title_label.setText("Ваш ход")
+        for btn in self.buttons:
+            btn.setEnabled(True)
+
+    def start_from_welcome(self):
+        """Начинаем игру с экрана приветствия"""
+        name = self.name_input.text().strip()
+        self.player_name = name if name else "Аноним"
+        self._update_buttons_grid()
+        self.show_game_ui()
+        self.player_label.setText(f"Игрок: {self.player_name}")
+        self._start_game()
+
+    def _start_game(self):
+        """Сброс и старт игры"""
+        self.level = 1
+        self.sequence = []
+        self.level_label.setText(f"Уровень {self.level}")
+        self.diff_game_label.setText(self.difficulty["name"])
+        self._start_level()
+
+    def play_again(self):
+        """Переиграть после проигрыша"""
+        self.level = 1
+        self.sequence = []
+        self.player_sequence = []
+        self.clickable = False
+        self._update_buttons_grid()
+        self.show_game_ui()
+        self.player_label.setText(f"Игрок: {self.player_name}")
+        self.diff_game_label.setText(self.difficulty["name"])
+        self._start_game()
+
+    def go_to_main_menu(self):
+        """Вернуться на главный экран"""
+        self.show_welcome_screen()
+
+    def show_records(self):
+        """Показать таблицу рекордов"""
+
+        class RecordsDialog(BaseDialog):
+            def __init__(self, records, parent=None):
+                super().__init__("Таблица рекордов", 700, 500, parent)
+
+                stats = QHBoxLayout()
+                stats.addWidget(self._create_stat_label(f"Всего записей: {len(records)}", 12))
+                if records:
+                    best = max(records, key=lambda x: x.get("level", 0))
+                    stats.addWidget(
+                        self._create_stat_label(f"Лучший: {best.get('level', '?')} ур. ({best.get('name', 'Аноним')})",
+                                                12, True))
+                self.content_layout.addLayout(stats)
+
+                self.records = records
+                self.table = QTableWidget()
+                self.table.setColumnCount(5)
+                self.table.setHorizontalHeaderLabels(["#", "Имя", "Уровень", "Сложность", "Дата"])
+                self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+                self.table.setStyleSheet("""
+                    QTableWidget { background-color: transparent; border: none; }
+                    QTableWidget::item { 
+                        color: #6B4F5A; 
+                        font-family: Georgia; 
+                        border: none; 
+                        background: transparent;
+                        padding: 5px;
+                    }
+                    QHeaderView::section { 
+                        background-color: #E8B4BC; 
+                        color: white; 
+                        font-family: Georgia; 
+                        padding: 8px; 
+                        border: none; 
+                    }
+                """)
+                self._update_table()
+                self.content_layout.addWidget(self.table)
+
+                btn = self.add_button("Закрыть", self.accept)
+                btn_layout = QHBoxLayout()
+                btn_layout.addStretch()
+                btn_layout.addWidget(btn)
+                btn_layout.addStretch()
+                self.content_layout.addLayout(btn_layout)
+
+            def _create_stat_label(self, text, size, bold=False):
+                label = QLabel(text)
+                label.setFont(QFont("Georgia", size, QFont.Bold if bold else QFont.Normal))
+                label.setStyleSheet("color: #8B6B76; border: none;")
+                return label
+
+            def _update_table(self):
+                self.table.setRowCount(len(self.records))
+                for i, r in enumerate(self.records):
+                    num_item = QTableWidgetItem(str(i + 1))
+                    num_item.setFont(QFont("Georgia", 11))
+                    num_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, 0, num_item)
+
+                    name_item = QTableWidgetItem(r.get("name", "Аноним"))
+                    name_item.setFont(QFont("Georgia", 11))
+                    self.table.setItem(i, 1, name_item)
+
+                    level_item = QTableWidgetItem(str(r.get("level", "?")))
+                    level_item.setFont(QFont("Georgia", 11))
+                    level_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(i, 2, level_item)
+
+                    diff_item = QTableWidgetItem(r.get("difficulty", "?"))
+                    diff_item.setFont(QFont("Georgia", 11))
+                    self.table.setItem(i, 3, diff_item)
+
+                    date_item = QTableWidgetItem(r.get("date", "?"))
+                    date_item.setFont(QFont("Georgia", 11))
+                    self.table.setItem(i, 4, date_item)
+
+        RecordsDialog(self.records, self).exec()
+
+    def open_difficulty_dialog(self):
+        """Открыть окно выбора сложности"""
+        dialog = DifficultyDialog(self.difficulty["name"], self)
+        if dialog.exec() == QDialog.Accepted:
+            self.difficulty = dialog.get_difficulty()
+            self.diff_label.setText(f"Сложность: {self.difficulty['name']}")
+            self.diff_game_label.setText(self.difficulty["name"])
+
+    def show_exit_confirmation(self):
+        """Диалог подтверждения выхода в меню"""
+        if ExitConfirmDialog(self.level, self).exec() == QDialog.Accepted:
+            self._save_record()
+            self.show_welcome_screen()
+
     def show_welcome_screen(self):
         self._clear_layout()
         self.main_layout.addWidget(self.welcome)
@@ -411,6 +661,7 @@ class MemoryOrderGame(QMainWindow):
         self.game_over.show()
 
     def _clear_layout(self):
+        """Прячем всё, что есть на экране"""
         while self.main_layout.count():
             item = self.main_layout.takeAt(0)
             if item.widget():
