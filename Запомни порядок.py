@@ -16,10 +16,11 @@ class BaseDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setFixedSize(width, height)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # убираем заголовок винды, рисуем свой
         self.setModal(True)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TranslucentBackground)  # чтобы скругления нормально смотрелись
 
+        # Делаем красивую рамку с закруглениями
         frame = QFrame()
         frame.setStyleSheet("background-color: #FDF5F5; border: 2px solid #E8B4BC; border-radius: 30px;")
 
@@ -27,19 +28,21 @@ class BaseDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(35, 30, 35, 30)
 
+        # Заголовок окна
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setFont(QFont("Georgia", 22, QFont.Light))
         title_label.setStyleSheet("color: #6B4F5A; border: none;")
         layout.addWidget(title_label)
 
-        self.content_layout = layout
+        self.content_layout = layout  # сюда докидываем всё остальное
 
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(frame)
         self.setLayout(main_layout)
 
     def add_button(self, text, callback):
+        """Создаёт розовую кнопку, всё как мы любим"""
         btn = QPushButton(text)
         btn.setFont(QFont("Georgia", 14))
         btn.setFixedSize(180, 40)
@@ -58,6 +61,8 @@ class BaseDialog(QDialog):
 
 
 class RulesDialog(BaseDialog):
+    """Окно с правилами игры, показывается при запуске"""
+
     def __init__(self, parent=None):
         super().__init__("Правила игры", 500, 320, parent)
 
@@ -77,6 +82,8 @@ class RulesDialog(BaseDialog):
 
 
 class ExitConfirmDialog(BaseDialog):
+    """Спрашиваем игрока — точно хочешь выйти?"""
+
     def __init__(self, level, parent=None):
         super().__init__("Выход в главное меню", 500, 320, parent)
 
@@ -100,9 +107,12 @@ class ExitConfirmDialog(BaseDialog):
 
 
 class DifficultyDialog(BaseDialog):
+    """Выбор сложности — лёгкий, средний, сложный, эксперт"""
+
     def __init__(self, current, parent=None):
         super().__init__("Выберите сложность", 500, 380, parent)
 
+        # Наши режимы сложности
         self.difficulties = {
             1: {"name": "Легкий", "speed": 800, "buttons": 4, "info": "800 мс • 4 кнопки"},
             2: {"name": "Средний", "speed": 600, "buttons": 6, "info": "600 мс • 6 кнопок"},
@@ -113,6 +123,7 @@ class DifficultyDialog(BaseDialog):
         self.group = QButtonGroup(self)
         self.radios = {}
 
+        # Создаём радиокнопки для выбора
         for i, diff in self.difficulties.items():
             radio = QRadioButton(diff["name"])
             radio.setFont(QFont("Georgia", 15))
@@ -121,7 +132,7 @@ class DifficultyDialog(BaseDialog):
                 QRadioButton::indicator { width: 18px; height: 18px; border-radius: 9px; border: 2px solid #E8B4BC; background-color: #FDF5F5; }
                 QRadioButton::indicator:checked { background-color: #E8B4BC; }
             """)
-            radio.setChecked(current == diff["name"])
+            radio.setChecked(current == diff["name"])  # отмечаем текущую сложность
             self.group.addButton(radio, i)
             self.radios[i] = radio
 
@@ -147,42 +158,52 @@ class DifficultyDialog(BaseDialog):
         return label
 
     def get_difficulty(self):
+        """Возвращает выбранную сложность"""
         return self.difficulties[self.group.checkedId()]
 
 
 class MemoryOrderGame(QMainWindow):
+    """Главная игра — запомни порядок"""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Запомни порядок")
-        self.setWindowState(Qt.WindowMaximized)
+        self.setWindowState(Qt.WindowMaximized)  # запускаем на весь экран
 
-        self.sequence = []
-        self.player_sequence = []
+        # Состояние игры
+        self.sequence = []         # что показала игра
+        self.player_sequence = []  # что нажал игрок
         self.level = 1
         self.buttons = []
-        self.is_showing = False
-        self.clickable = False
+        self.is_showing = False    # идёт ли показ последовательности
+        self.clickable = False     # можно ли нажимать кнопки
         self.player_name = "Аноним"
         self.records = self._load_records()
 
+        # Текущая сложность
         self.difficulty = {"name": "Легкий", "speed": 800, "buttons": 4}
 
+        # Звуки
         self.sounds = {}
         self._init_sounds()
 
+        # Центральный виджет и главный лейаут
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Создаём экраны
         self._create_welcome_screen()
         self._create_game_ui()
         self._create_game_over_ui()
 
+        # Показываем приветствие и через полсекунды — правила
         self.show_welcome_screen()
         QTimer.singleShot(500, lambda: RulesDialog(self).exec())
 
     def _init_sounds(self):
+        """Загружаем звуки клика, повышения уровня и проигрыша"""
         sound_files = ["click.wav", "levelup.wav", "gameover.wav"]
         for name in sound_files:
             sound = QSoundEffect()
@@ -193,19 +214,21 @@ class MemoryOrderGame(QMainWindow):
             self.sounds[name.replace(".wav", "")] = sound
 
     def _load_records(self):
+        """Подгружаем таблицу рекордов из JSON, если есть"""
         try:
             if os.path.exists("records.json"):
                 with open("records.json", "r", encoding="utf-8") as f:
                     records = json.load(f)
                     for r in records:
                         r.setdefault("name", "Аноним")
-                    records.sort(key=lambda x: x.get("date", ""), reverse=True)
+                    records.sort(key=lambda x: x.get("date", ""), reverse=True)  # новые сверху
                     return records
         except:
             pass
         return []
 
     def _save_record(self):
+        """Сохраняем результат в JSON, храним не больше 15 записей"""
         record = {
             "name": self.player_name,
             "level": self.level - 1,
@@ -214,7 +237,7 @@ class MemoryOrderGame(QMainWindow):
         }
         self.records.append(record)
         self.records.sort(key=lambda x: x.get("date", ""), reverse=True)
-        self.records = self.records[:15]
+        self.records = self.records[:15]  # обрезаем до 15
 
         try:
             with open("records.json", "w", encoding="utf-8") as f:
@@ -223,6 +246,7 @@ class MemoryOrderGame(QMainWindow):
             pass
 
     def _create_button_style(self, color, btn_size, font_size, disabled=False):
+        """Стили для игровых кнопок — обычные и неактивные"""
         if disabled:
             return f"""
                 QPushButton {{
@@ -249,11 +273,13 @@ class MemoryOrderGame(QMainWindow):
         """
 
     def _create_welcome_screen(self):
+        """Экран приветствия с именем, сложностью и кнопками"""
         self.welcome = QWidget()
         layout = QVBoxLayout()
         layout.setSpacing(20)
         layout.setAlignment(Qt.AlignCenter)
 
+        # Декоративные надписи и название игры
         for text in ["✧ ✦ ✧", "Запомни порядок", "❀ ❁ ❀"]:
             label = QLabel(text)
             label.setAlignment(Qt.AlignCenter)
@@ -263,6 +289,7 @@ class MemoryOrderGame(QMainWindow):
                 f"color: #6B4F5A; border: none;" if text == "Запомни порядок" else "color: #E0C8D0; border: none;")
             layout.addWidget(label)
 
+        # Поле для ввода имени
         name_frame = QFrame()
         name_frame.setStyleSheet(
             "background-color: rgba(232, 180, 188, 0.1); border: 2px solid #E8B4BC; border-radius: 25px;")
@@ -289,6 +316,7 @@ class MemoryOrderGame(QMainWindow):
         name_layout.addWidget(self.name_input, alignment=Qt.AlignCenter)
         layout.addWidget(name_frame)
 
+        # Текущая сложность
         self.diff_label = self._create_label(f"Сложность: {self.difficulty['name']}", 14, "#8B6B76")
         layout.addWidget(self.diff_label)
 
@@ -298,6 +326,7 @@ class MemoryOrderGame(QMainWindow):
         start_btn = self._create_button("Начать игру", 220, 60, 16, self.start_from_welcome)
         layout.addWidget(start_btn, alignment=Qt.AlignCenter)
 
+        # Кнопки: правила, рекорды, выход
         info_layout = QHBoxLayout()
         info_layout.setSpacing(20)
         info_layout.setAlignment(Qt.AlignCenter)
@@ -311,15 +340,17 @@ class MemoryOrderGame(QMainWindow):
         self.welcome.setLayout(layout)
 
     def _create_game_ui(self):
+        """Основной игровой экран"""
         self.game = QWidget()
         layout = QVBoxLayout()
         layout.setSpacing(30)
         layout.setContentsMargins(20, 20, 20, 20)
 
+        # Верхняя панель: заголовок и кнопка выхода
         top = QWidget()
         top_layout = QHBoxLayout(top)
         top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.addWidget(QWidget())
+        top_layout.addWidget(QWidget())  # распорка слева
         self.title_label = self._create_label("Запомни порядок", 32, "#6B4F5A")
         top_layout.addWidget(self.title_label, 1)
 
@@ -327,6 +358,7 @@ class MemoryOrderGame(QMainWindow):
         top_layout.addWidget(exit_btn)
         layout.addWidget(top)
 
+        # Инфо: имя игрока, уровень, сложность
         info = QWidget()
         info_layout = QHBoxLayout(info)
         info_layout.setAlignment(Qt.AlignCenter)
@@ -339,6 +371,7 @@ class MemoryOrderGame(QMainWindow):
         info_layout.addWidget(self.diff_game_label)
         layout.addWidget(info, alignment=Qt.AlignCenter)
 
+        # Сетка с игровыми кнопками
         self.buttons_grid = QGridLayout()
         self.buttons_grid.setSpacing(20)
         self.buttons_grid.setAlignment(Qt.AlignCenter)
@@ -347,6 +380,7 @@ class MemoryOrderGame(QMainWindow):
         self.game.setLayout(layout)
 
     def _create_game_over_ui(self):
+        """Экран окончания игры"""
         self.game_over = QWidget()
         layout = QVBoxLayout()
         layout.setSpacing(20)
@@ -369,6 +403,7 @@ class MemoryOrderGame(QMainWindow):
         self.game_over.setLayout(layout)
 
     def _create_label(self, text, size, color, italic=False):
+        """Быстрое создание label с нужным шрифтом и цветом"""
         label = QLabel(text)
         label.setAlignment(Qt.AlignCenter)
         label.setFont(QFont("Georgia", size, italic=italic))
@@ -376,6 +411,7 @@ class MemoryOrderGame(QMainWindow):
         return label
 
     def _create_button(self, text, width, height, font_size, callback):
+        """Быстрое создание кнопки в едином стиле"""
         btn = QPushButton(text)
         btn.setFont(QFont("Georgia", font_size))
         btn.setFixedSize(width, height)
@@ -394,14 +430,13 @@ class MemoryOrderGame(QMainWindow):
 
     def _get_button_size(self):
         """Размер кнопок зависит от их количества"""
-        if self.difficulty["buttons"] <= 6:
-            return 100, 28
-        if self.difficulty["buttons"] <= 8:
-            return 90, 24
+        if self.difficulty["buttons"] <= 6: return 100, 28
+        if self.difficulty["buttons"] <= 8: return 90, 24
         return 80, 22
 
     def _update_buttons_grid(self):
         """Пересоздаём игровое поле под новую сложность"""
+        # Удаляем старые кнопки
         for btn in self.buttons:
             btn.deleteLater()
         self.buttons = []
@@ -411,11 +446,13 @@ class MemoryOrderGame(QMainWindow):
             if item.widget():
                 item.widget().deleteLater()
 
+        # Палитра цветов для кнопок
         self.button_colors = ["#F3E3E5", "#EFDADE", "#EBD1D6", "#E7C8CE", "#F2D0D9", "#EDC5D0", "#E8BAC7", "#E3AFC0",
                               "#DEA4B6", "#D999AC"]
-        cols = self.difficulty["buttons"] // 2
+        cols = self.difficulty["buttons"] // 2  # сколько кнопок в ряду
         btn_size, font_size = self._get_button_size()
 
+        # Создаём кнопки
         for i in range(self.difficulty["buttons"]):
             btn = QPushButton(str(i + 1))
             btn.setFont(QFont("Georgia", font_size, QFont.Bold))
@@ -424,22 +461,23 @@ class MemoryOrderGame(QMainWindow):
             btn.setStyleSheet(
                 self._create_button_style(self.button_colors[i % len(self.button_colors)], btn_size, font_size))
             btn.clicked.connect(lambda idx=i: self._on_button_click(idx))
-            btn.setEnabled(False)
+            btn.setEnabled(False)  # пока нельзя нажимать
             self.buttons.append(btn)
             self.buttons_grid.addWidget(btn, i // cols, i % cols)
 
     def _on_button_click(self, index):
         """Игрок нажал на кнопку — запоминаем и подсвечиваем"""
         if not self.is_showing and self.clickable and self.buttons[index].isEnabled():
-            self.clickable = False
+            self.clickable = False  # на время подсветки блокируем
             self.player_sequence.append(index)
             if self.sounds.get("click"):
                 self.sounds["click"].play()
 
+            # Подсветка при нажатии
             btn_size, font_size = self._get_button_size()
             self.buttons[index].setStyleSheet(self._create_button_style("#D9BCC2", btn_size, font_size))
             QTimer.singleShot(200, lambda: self._restore_button_color(index))
-            QTimer.singleShot(200, self._check_sequence)
+            QTimer.singleShot(200, self._check_sequence)  # проверяем через 200 мс
 
     def _restore_button_color(self, index):
         """Возвращаем кнопке её обычный цвет"""
@@ -447,16 +485,16 @@ class MemoryOrderGame(QMainWindow):
             btn_size, font_size = self._get_button_size()
             self.buttons[index].setStyleSheet(
                 self._create_button_style(self.button_colors[index % len(self.button_colors)], btn_size, font_size))
-            self.clickable = True
+            self.clickable = True  # снова можно нажимать
 
     def _check_sequence(self):
         """Проверяем, правильно ли игрок повторяет последовательность"""
         if not self.player_sequence:
             return
         if self.player_sequence[-1] != self.sequence[len(self.player_sequence) - 1]:
-            self._game_over()
+            self._game_over()  # ошибка — конец
         elif len(self.player_sequence) == len(self.sequence):
-            self._level_complete()
+            self._level_complete()  # всё верно — следующий уровень
 
     def _level_complete(self):
         """Уровень пройден!"""
@@ -482,6 +520,7 @@ class MemoryOrderGame(QMainWindow):
         for btn in self.buttons:
             btn.setEnabled(False)
 
+        # Добавляем новую кнопку в последовательность
         if self.level == 1:
             self.sequence = [random.randint(0, self.difficulty["buttons"] - 1)]
         else:
@@ -556,6 +595,7 @@ class MemoryOrderGame(QMainWindow):
             def __init__(self, records, parent=None):
                 super().__init__("Таблица рекордов", 700, 500, parent)
 
+                # Краткая статистика
                 stats = QHBoxLayout()
                 stats.addWidget(self._create_stat_label(f"Всего записей: {len(records)}", 12))
                 if records:
@@ -570,7 +610,7 @@ class MemoryOrderGame(QMainWindow):
                 self.table.setColumnCount(5)
                 self.table.setHorizontalHeaderLabels(["#", "Имя", "Уровень", "Сложность", "Дата"])
                 self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-                self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+                self.table.setEditTriggers(QTableWidget.NoEditTriggers)  # только чтение
                 self.table.setStyleSheet("""
                     QTableWidget { background-color: transparent; border: none; }
                     QTableWidget::item { 
@@ -605,26 +645,32 @@ class MemoryOrderGame(QMainWindow):
                 return label
 
             def _update_table(self):
+                """Заполняем таблицу данными"""
                 self.table.setRowCount(len(self.records))
                 for i, r in enumerate(self.records):
+                    # Номер
                     num_item = QTableWidgetItem(str(i + 1))
                     num_item.setFont(QFont("Georgia", 11))
                     num_item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(i, 0, num_item)
 
+                    # Имя
                     name_item = QTableWidgetItem(r.get("name", "Аноним"))
                     name_item.setFont(QFont("Georgia", 11))
                     self.table.setItem(i, 1, name_item)
 
+                    # Уровень
                     level_item = QTableWidgetItem(str(r.get("level", "?")))
                     level_item.setFont(QFont("Georgia", 11))
                     level_item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(i, 2, level_item)
 
+                    # Сложность
                     diff_item = QTableWidgetItem(r.get("difficulty", "?"))
                     diff_item.setFont(QFont("Georgia", 11))
                     self.table.setItem(i, 3, diff_item)
 
+                    # Дата
                     date_item = QTableWidgetItem(r.get("date", "?"))
                     date_item.setFont(QFont("Georgia", 11))
                     self.table.setItem(i, 4, date_item)
